@@ -9,13 +9,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-
 #define PATH_PREFIX "file://"
 #define PATH_PORTAL "/tmp/cli.portal"
-
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.FileChooser";
-
 static int exec_filechooser(void *data, bool writing, bool multiple, bool directory, char *path, char ***selected_files, size_t *num_selected_files) {
     struct xdpw_state *state = data;
     char *cmd_script = state->config->filechooser_conf.cmd;
@@ -23,15 +20,12 @@ static int exec_filechooser(void *data, bool writing, bool multiple, bool direct
         logprint(ERROR, "cmd not specified");
         return -1;
     }
-
     if (path == NULL) {
         path = "";
     }
-
     size_t str_size = snprintf(NULL, 0, "%s %d %d %d \"%s\" \"%s\"", cmd_script, multiple, directory, writing, path, PATH_PORTAL) + 1;
     char *cmd = malloc(str_size);
     snprintf(cmd, str_size, "%s %d %d %d \"%s\" \"%s\"", cmd_script, multiple, directory, writing, path, PATH_PORTAL);
-
     remove(PATH_PORTAL);
     logprint(TRACE, "executing command: %s", cmd);
     int ret = system(cmd);
@@ -41,13 +35,11 @@ static int exec_filechooser(void *data, bool writing, bool multiple, bool direct
         return -1;
     }
     free(cmd);
-
     FILE *fp = fopen(PATH_PORTAL, "r");
     if (fp == NULL) {
         logprint(ERROR, "failed to open " PATH_PORTAL);
         return -1;
     }
-
     size_t num_lines = 0;
     int cr;
     do {
@@ -60,14 +52,11 @@ static int exec_filechooser(void *data, bool writing, bool multiple, bool direct
         }
     } while (cr != EOF);
     rewind(fp);
-
     if (num_lines == 0) {
         num_lines = 1;
     }
-
     *num_selected_files = num_lines;
     *selected_files = malloc((num_lines + 1) * sizeof(char*));
-
     for (size_t i = 0; i < num_lines; i++) {
         size_t n = 0;
         char *line = NULL;
@@ -89,20 +78,16 @@ static int exec_filechooser(void *data, bool writing, bool multiple, bool direct
         free(line);
     }
     (*selected_files)[num_lines] = NULL;
-
     fclose(fp);
     return 0;
 }
-
 static int method_open_file(sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
     int ret = 0;
-
     char *handle, *app_id, *parent_window, *title;
     ret = sd_bus_message_read(msg, "osss", &handle, &app_id, &parent_window, &title);
     if (ret < 0) {
         return ret;
     }
-
     ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
     if (ret < 0) {
         return ret;
@@ -115,7 +100,6 @@ static int method_open_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
         if (inner_ret < 0) {
             return inner_ret;
         }
-
         logprint(DEBUG, "dbus: option %s", key);
         if (strcmp(key, "multiple") == 0) {
             sd_bus_message_read(msg, "v", "b", &multiple);
@@ -131,7 +115,6 @@ static int method_open_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
             logprint(WARN, "dbus: unknown option %s", key);
             sd_bus_message_skip(msg, "v");
         }
-
         inner_ret = sd_bus_message_exit_container(msg);
         if (inner_ret < 0) {
             return inner_ret;
@@ -144,102 +127,81 @@ static int method_open_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
     if (ret < 0) {
         return ret;
     }
-
-    // TODO: cleanup this
     struct xdpw_request *req =
         xdpw_request_create(sd_bus_message_get_bus(msg), handle);
     if (req == NULL) {
         return -ENOMEM;
     }
-
     char **selected_files = NULL;
     size_t num_selected_files = 0;
     ret = exec_filechooser(data, false, multiple, directory, NULL, &selected_files, &num_selected_files);
     if (ret) {
         goto cleanup;
     }
-
     logprint(TRACE, "(OpenFile) Number of selected files: %d", num_selected_files);
     for (size_t i = 0; i < num_selected_files; i++) {
         logprint(TRACE, "%d. %s", i, selected_files[i]);
     }
-
     sd_bus_message *reply = NULL;
     ret = sd_bus_message_new_method_return(msg, &reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append(reply, "u", PORTAL_RESPONSE_SUCCESS, 1);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'a', "{sv}");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'e', "sv");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append_basic(reply, 's', "uris");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'v', "as");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append_strv(reply, selected_files);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_send(NULL, reply, NULL);
     if (ret < 0) {
         goto cleanup;
     }
-
     sd_bus_message_unref(reply);
-
 cleanup:
     for (size_t i = 0; i < num_selected_files; i++) {
         free(selected_files[i]);
     }
     free(selected_files);
-
     return ret;
 }
-
 static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
     int ret = 0;
-
     char *handle, *app_id, *parent_window, *title;
     ret = sd_bus_message_read(msg, "osss", &handle, &app_id, &parent_window, &title);
     if (ret < 0) {
         return ret;
     }
-
     ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
     if (ret < 0) {
         return ret;
@@ -253,7 +215,6 @@ static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
         if (inner_ret < 0) {
             return inner_ret;
         }
-
         logprint(DEBUG, "dbus: option %s", key);
         if (strcmp(key, "current_name") == 0) {
             sd_bus_message_read(msg, "v", "s", &current_name);
@@ -275,20 +236,16 @@ static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
             logprint(WARN, "dbus: unknown option %s", key);
             sd_bus_message_skip(msg, "v");
         }
-
         inner_ret = sd_bus_message_exit_container(msg);
         if (inner_ret < 0) {
             return inner_ret;
         }
     }
-
-    // TODO: cleanup this
     struct xdpw_request *req =
         xdpw_request_create(sd_bus_message_get_bus(msg), handle);
     if (req == NULL) {
         return -ENOMEM;
     }
-
     if (current_folder == NULL) {
         struct xdpw_state *state = data;
         char *default_dir = state->config->filechooser_conf.default_dir;
@@ -298,11 +255,9 @@ static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
         }
         current_folder = default_dir;
     }
-
     size_t path_size = snprintf(NULL, 0, "%s/%s", current_folder, current_name) + 1;
     char *path = malloc(path_size);
     snprintf(path, path_size, "%s/%s", current_folder, current_name);
-
     bool file_already_exists = true;
     while (file_already_exists) {
         if (access(path, F_OK) == 0) {
@@ -316,7 +271,6 @@ static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
             file_already_exists = false;
         }
     }
-
     char **selected_files = NULL;
     size_t num_selected_files = 0;
     ret = exec_filechooser(data, true, false, false, path, &selected_files, &num_selected_files);
@@ -325,89 +279,71 @@ static int method_save_file(sd_bus_message *msg, void *data, sd_bus_error *ret_e
         ret = -1;
         goto cleanup;
     }
-
     logprint(TRACE, "(SaveFile) Number of selected files: %d", num_selected_files);
     for (size_t i = 0; i < num_selected_files; i++) {
         logprint(TRACE, "%d. %s", i, selected_files[i]);
     }
-
     sd_bus_message *reply = NULL;
     ret = sd_bus_message_new_method_return(msg, &reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append(reply, "u", PORTAL_RESPONSE_SUCCESS, 1);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'a', "{sv}");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'e', "sv");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append_basic(reply, 's', "uris");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_open_container(reply, 'v', "as");
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_append_strv(reply, selected_files);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_message_close_container(reply);
     if (ret < 0) {
         goto cleanup;
     }
-
     ret = sd_bus_send(NULL, reply, NULL);
     if (ret < 0) {
         goto cleanup;
     }
-
     sd_bus_message_unref(reply);
-
 cleanup:
     for (size_t i = 0; i < num_selected_files; i++) {
         free(selected_files[i]);
     }
     free(selected_files);
     free(path);
-
     return ret;
 }
-
 static const sd_bus_vtable filechooser_vtable[] = {
     SD_BUS_VTABLE_START(0),
     SD_BUS_METHOD("OpenFile", "osssa{sv}", "ua{sv}", method_open_file, SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_METHOD("SaveFile", "osssa{sv}", "ua{sv}", method_save_file, SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_VTABLE_END
 };
-
 int xdpw_filechooser_init(struct xdpw_state *state) {
-    // TODO: cleanup
     sd_bus_slot *slot = NULL;
     logprint(DEBUG, "dbus: init %s", interface_name);
     return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
