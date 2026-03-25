@@ -1,0 +1,6 @@
+[Unit]
+Description=Portal service (terminal file chooser implementation)
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.cli
+ExecStart=@libexecdir@/xdg-desktop-portal-cli
