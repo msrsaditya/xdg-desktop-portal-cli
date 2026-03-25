@@ -1,5 +1,5 @@
 [Unit]
-Description=Portal service (terminal file chooser implementation)
+Description=Portal service
 [Service]
 Type=dbus
 BusName=org.freedesktop.impl.portal.desktop.cli
