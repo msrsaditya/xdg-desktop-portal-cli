@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ini.h>
-#define FILECHOOSER_DEFAULT_CMD "/home/Shashank/.local/bin/LF/file-picker.sh"
+#define FILECHOOSER_DEFAULT_CMD "/home/shashank/.config/scripts/lf/file-picker.sh"
 #define FILECHOOSER_DEFAULT_DIR "/tmp"
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
     logprint(loglevel, "config: cmd:  %s", config->filechooser_conf.cmd);

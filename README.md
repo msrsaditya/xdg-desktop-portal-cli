@@ -72,7 +72,7 @@ Add the following to the `config` file, modifying the paths to match your system
 ```ini
 [filechooser]
 # The script or command to launch your terminal file manager
-cmd=/home/username/.local/bin/LF/file-picker.sh
+cmd=/home/username/.local/bin/lf/file-picker.sh
 
 # The default directory to open when saving a file if none is provided
 default_dir=/tmp
